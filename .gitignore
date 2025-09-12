@@ -1,0 +1,12 @@
+# Ignore le fichier de config sensible
+config.json
+
+# Ignore les caches Python
+__pycache__/
+*.pyc
+
+# Ignore les logs
+*.log
+
+# Optionnel : VSCode settings
+.vscode/
