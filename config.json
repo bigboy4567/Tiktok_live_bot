@@ -1,0 +1,32 @@
+{
+            "_comment": "===== CONFIG UTILISATEUR =====",
+                    "USERNAME": "1234",
+                    "PASSWORD": "5678",
+
+
+    "_comment_mail": "===== CONFIG EMAIL POUR ENVOI NOTIFS =====",
+            "EMAIL_SENDER": "nicolasquevillon00@gmail.com",
+            "EMAIL_RECEIVER": "nicolasquevillon00@gmail.com",
+            "EMAIL_PASSWORD": "gjwl yrmu eqfw zpgv ",
+
+
+        "_comment_tiktok": "===== IDENTIFIANTS TIKTOK =====",
+            "EMAIL_LOGIN_TIKTOK": "nicolasquevillon00@gmail.com",
+            "EMAIL_PASSWORD_TIKTOK": "YouYou5565**",
+
+
+    "_comment_bot": "===== CONFIG BOT (ACTIONS AUTOMATISÉES) =====",
+                        "WINDOW_SIZE": [1000, 800],
+                        "CLICK_INTERVAL_MIN": 0.5,
+                        "CLICK_INTERVAL_MAX": 1.1,
+                        "HUMAN_PAUSE_FREQ_MIN": 100,
+                        "HUMAN_PAUSE_FREQ_MAX": 160,
+                        "HUMAN_PAUSE_MIN": 5,
+                        "HUMAN_PAUSE_MAX": 60,
+                        "CLEAR_INTERVAL": 180,
+
+    "_comment_auto_updater": "===== CONFIG BOT (ACTIONS AUTOMATISÉES) =====",
+
+"UPDATE_URL": "https://raw.githubusercontent.com/bigboy4567/Tiktok_live_bot/blob/main/Main.py"
+
+}
