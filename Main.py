@@ -28,6 +28,34 @@ EMAIL_PASSWORD = config["EMAIL_PASSWORD"]
 EMAIL_RECEIVER = config["EMAIL_RECEIVER"]
 EMAIL_LOGIN_TIKTOK = config["EMAIL_LOGIN_TIKTOK"]
 EMAIL_PASSWORD_TIKTOK = config["EMAIL_PASSWORD_TIKTOK"]
+UPDATE_URL = config.get("UPDATE_URL", None)  # 🔥 URL d’update (GitHub brut)
+
+# ---------------- AUTO UPDATE ----------------
+def auto_update():
+    if not UPDATE_URL:
+        return
+    try:
+        # Lire la version locale
+        script_path = os.path.abspath(__file__)
+        with open(script_path, "r", encoding="utf-8") as f:
+            local_code = f.read()
+
+        # Télécharger la version en ligne
+        r = requests.get(UPDATE_URL, timeout=10)
+        if r.status_code == 200:
+            remote_code = r.text
+            if remote_code.strip() != local_code.strip():
+                print("⬆️ Nouvelle version détectée, mise à jour en cours...")
+                backup_path = script_path + ".bak"
+                os.rename(script_path, backup_path)  # backup
+                with open(script_path, "w", encoding="utf-8") as f:
+                    f.write(remote_code)
+                print("✅ Mise à jour effectuée, redémarrage...")
+                os.execv(sys.executable, ["python"] + sys.argv)
+        else:
+            print(f"⚠️ Impossible de vérifier l’update ({r.status_code})")
+    except Exception as e:
+        print(f"⚠️ Erreur auto-update: {e}")
 
 # ---------------- BOT CONFIG ----------------
 WINDOW_SIZE = tuple(config["WINDOW_SIZE"])
@@ -327,6 +355,8 @@ def launch_ngrok():
 
 # ---------------- Lancement ----------------
 if __name__ == "__main__":
+    auto_update()  # 🔥 Vérifie l’update au lancement
+
     flask_thread = threading.Thread(target=lambda: app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False))
     flask_thread.start()
     time.sleep(3)
