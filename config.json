@@ -20,5 +20,10 @@
     "HUMAN_PAUSE_FREQ_MAX": 160,
     "HUMAN_PAUSE_MIN": 5,
     "HUMAN_PAUSE_MAX": 60,
-    "CLEAR_INTERVAL": 180
+    "CLEAR_INTERVAL": 180,
+
+    "_comment_auto_updater": "===== CONFIG BOT (ACTIONS AUTOMATISÉES) =====",
+
+"UPDATE_URL": "https://raw.githubusercontent.com/bigboy4567/Tiktok_live_bot/blob/main/Main.py"
+
 }
