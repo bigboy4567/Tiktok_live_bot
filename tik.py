@@ -13,6 +13,7 @@ from functools import wraps
 import json
 import requests
 import subprocess
+print("Test auto-update v1.1")
 
 # ---------------- CONFIG JSON ----------------
 script_dir = os.path.dirname(os.path.abspath(__file__))
