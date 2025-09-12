@@ -35,25 +35,41 @@ def auto_update():
     if not UPDATE_URL:
         return
     try:
-        # Lire la version locale
+        # Télécharger la nouvelle version
+        r = requests.get(UPDATE_URL, timeout=10)
+        if r.status_code != 200:
+            print(f"⚠️ Impossible de vérifier l’update ({r.status_code})")
+            return
+
+        remote_code = r.text
+
         script_path = os.path.abspath(__file__)
+        # Lire la version locale
         with open(script_path, "r", encoding="utf-8") as f:
             local_code = f.read()
 
-        # Télécharger la version en ligne
-        r = requests.get(UPDATE_URL, timeout=10)
-        if r.status_code == 200:
-            remote_code = r.text
-            if remote_code.strip() != local_code.strip():
-                print("⬆️ Nouvelle version détectée, mise à jour en cours...")
-                backup_path = script_path + ".bak"
-                os.rename(script_path, backup_path)  # backup
-                with open(script_path, "w", encoding="utf-8") as f:
-                    f.write(remote_code)
-                print("✅ Mise à jour effectuée, redémarrage...")
-                os.execv(sys.executable, ["python"] + sys.argv)
-        else:
-            print(f"⚠️ Impossible de vérifier l’update ({r.status_code})")
+        if remote_code.strip() != local_code.strip():
+            print("⬆️ Nouvelle version détectée, mise à jour en cours...")
+
+            backup_path = script_path + ".bak"
+            os.rename(script_path, backup_path)  # backup
+
+            # Sauvegarde temporaire du config local
+            config_backup_path = script_dir + "/config_backup.json"
+            if os.path.exists(config_path):
+                os.rename(config_path, config_backup_path)
+
+            # Écrire la nouvelle version du code
+            with open(script_path, "w", encoding="utf-8") as f:
+                f.write(remote_code)
+
+            # Restaurer config local
+            if os.path.exists(config_backup_path):
+                os.rename(config_backup_path, config_path)
+
+            print("✅ Mise à jour effectuée, redémarrage...")
+            os.execv(sys.executable, ["python"] + sys.argv)
+
     except Exception as e:
         print(f"⚠️ Erreur auto-update: {e}")
 
