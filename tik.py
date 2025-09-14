@@ -9,15 +9,25 @@ from flask import Flask, request, render_template_string, Response
 import keyboard
 import undetected_chromedriver as uc
 from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.common.keys import Keys
 from functools import wraps
 import json
 import requests
 import subprocess
-print("Test auto-update vpenis)
+import tkinter as tk
+import psutil
+import matplotlib
+matplotlib.use("TkAgg")
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+# ---------------- Bande Passante ----------------
+net_stats = {"last_bytes_sent": 0, "last_bytes_recv": 0}
+bandwidth_data = {"time": [], "upload": [], "download": []}
 
 # ---------------- CONFIG JSON ----------------
 script_dir = os.path.dirname(os.path.abspath(__file__))
-config_path = os.path.join(script_dir, "config.json")
+config_path = os.path.join(script_dir, "config_example.json")
 
 with open(config_path, "r") as f:
     config = json.load(f)
@@ -29,50 +39,6 @@ EMAIL_PASSWORD = config["EMAIL_PASSWORD"]
 EMAIL_RECEIVER = config["EMAIL_RECEIVER"]
 EMAIL_LOGIN_TIKTOK = config["EMAIL_LOGIN_TIKTOK"]
 EMAIL_PASSWORD_TIKTOK = config["EMAIL_PASSWORD_TIKTOK"]
-UPDATE_URL = config.get("UPDATE_URL", None)  # 🔥 URL d’update (GitHub brut)
-
-# ---------------- AUTO UPDATE ----------------
-def auto_update():
-    if not UPDATE_URL:
-        return
-    try:
-        # Télécharger la nouvelle version
-        r = requests.get(UPDATE_URL, timeout=10)
-        if r.status_code != 200:
-            print(f"⚠️ Impossible de vérifier l’update ({r.status_code})")
-            return
-
-        remote_code = r.text
-
-        script_path = os.path.abspath(__file__)
-        # Lire la version locale
-        with open(script_path, "r", encoding="utf-8") as f:
-            local_code = f.read()
-
-        if remote_code.strip() != local_code.strip():
-            print("⬆️ Nouvelle version détectée, mise à jour en cours...")
-
-            backup_path = script_path + ".bak"
-            os.rename(script_path, backup_path)  # backup
-
-            # Sauvegarde temporaire du config local
-            config_backup_path = script_dir + "/config_backup.json"
-            if os.path.exists(config_path):
-                os.rename(config_path, config_backup_path)
-
-            # Écrire la nouvelle version du code
-            with open(script_path, "w", encoding="utf-8") as f:
-                f.write(remote_code)
-
-            # Restaurer config local
-            if os.path.exists(config_backup_path):
-                os.rename(config_backup_path, config_path)
-
-            print("✅ Mise à jour effectuée, redémarrage...")
-            os.execv(sys.executable, ["python"] + sys.argv)
-
-    except Exception as e:
-        print(f"⚠️ Erreur auto-update: {e}")
 
 # ---------------- BOT CONFIG ----------------
 WINDOW_SIZE = tuple(config["WINDOW_SIZE"])
@@ -83,6 +49,9 @@ HUMAN_PAUSE_FREQ_MAX = config["HUMAN_PAUSE_FREQ_MAX"]
 HUMAN_PAUSE_MIN = config["HUMAN_PAUSE_MIN"]
 HUMAN_PAUSE_MAX = config["HUMAN_PAUSE_MAX"]
 CLEAR_INTERVAL = config["CLEAR_INTERVAL"]
+HUMAN_DELAYS = config["HUMAN_DELAYS"]
+
+REFRESH_INTERVAL = 20 * 60  # 20 minutes
 
 running = False
 driver = None
@@ -103,13 +72,11 @@ def set_status(msg):
 
 # ---------------- Email ----------------
 def send_email_alert(subject, body):
-    """Envoie un mail si une étape échoue ou si live terminé"""
     try:
         msg = MIMEText(body)
         msg["Subject"] = subject
         msg["From"] = EMAIL_SENDER
         msg["To"] = EMAIL_RECEIVER
-
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(EMAIL_SENDER, EMAIL_PASSWORD)
             server.sendmail(EMAIL_SENDER, EMAIL_RECEIVER, msg.as_string())
@@ -117,9 +84,15 @@ def send_email_alert(subject, body):
     except Exception as e:
         set_status(f"⚠️ Erreur envoi email : {e}")
 
+# ---------------- Timings Humains ----------------
+def get_human_delay():
+    base = random.choice(HUMAN_DELAYS)
+    variation = random.uniform(-5, 5)
+    delay = max(100, base + variation)
+    return delay / 1000.0
+
 # ---------------- Retry Helper ----------------
 def try_action(description, func, retries=3, wait=2, fatal=True):
-    """Réessaye une action Selenium jusqu’à 3 fois"""
     for attempt in range(1, retries + 1):
         try:
             func()
@@ -131,6 +104,25 @@ def try_action(description, func, retries=3, wait=2, fatal=True):
     if fatal:
         send_email_alert("⚠️ Bot TikTok - Échec critique", f"L’étape '{description}' a échoué après {retries} tentatives.")
     return False
+
+def get_bandwidth():
+    global net_stats
+    counters = psutil.net_io_counters()
+    sent = counters.bytes_sent
+    recv = counters.bytes_recv
+
+    if net_stats["last_bytes_sent"] == 0:
+        net_stats["last_bytes_sent"] = sent
+        net_stats["last_bytes_recv"] = recv
+        return 0, 0
+
+    upload = (sent - net_stats["last_bytes_sent"]) / 1024
+    download = (recv - net_stats["last_bytes_recv"]) / 1024
+
+    net_stats["last_bytes_sent"] = sent
+    net_stats["last_bytes_recv"] = recv
+
+    return upload, download
 
 # ---------------- Auth Flask ----------------
 def check_auth(username, password):
@@ -171,14 +163,11 @@ def auto_like():
             if not actions:
                 actions = ActionChains(driver)
             try:
-                # Vérifier si le live est terminé
                 if "live terminé" in driver.page_source.lower():
                     set_status("⚠️ Live terminé détecté !")
                     send_email_alert("Bot TikTok - Live terminé", f"Le live {current_live} est terminé.")
                     running = False
                     continue
-
-                # Envoi like
                 if random.random() < 0.9:
                     actions.send_keys("l").perform()
                     likes_sent += 1
@@ -188,15 +177,13 @@ def auto_like():
             except Exception as e:
                 set_status(f"⚠️ Erreur auto_like: {e}")
 
-            # Pause humaine
             if time.time() >= next_pause_time:
                 pause_duration = random.randint(HUMAN_PAUSE_MIN, HUMAN_PAUSE_MAX)
                 set_status(f"⏸️ Pause humaine pour {pause_duration} sec...")
                 time.sleep(pause_duration)
                 next_pause_time = time.time() + random.randint(HUMAN_PAUSE_FREQ_MIN, HUMAN_PAUSE_FREQ_MAX)
 
-            interval = random.uniform(CLICK_INTERVAL_MIN, CLICK_INTERVAL_MAX)
-            time.sleep(interval)
+            time.sleep(get_human_delay())
         else:
             time.sleep(0.1)
 
@@ -211,38 +198,134 @@ def launch_driver():
     driver.set_window_size(WINDOW_SIZE[0], WINDOW_SIZE[1])
     driver.set_window_position(100, 100)
     driver.get(current_live)
-
-    # Refresh une fois
     time.sleep(3)
     driver.refresh()
     set_status("🔄 Page rafraîchie")
-    time.sleep(10)  # Attente 10s après refresh
-
-    # Connexion TikTok
-    try_action("Bouton 'Ignorer'", lambda: driver.find_element("xpath", "//div[text()='Ignorer']").click())
-    try_action("Bouton 'Se connecter'", lambda: driver.find_element("id", "top-right-action-bar-login-button").click())
+    time.sleep(10)
+    try_action("Bouton 'Se connecter'", lambda: driver.find_element(
+        "xpath", "//div[text()='Se connecter']/ancestor::button"
+    ).click())
     try_action("Option 'Utiliser téléphone/email'", lambda: driver.find_element(
         "xpath", "//div[contains(text(),\"Utiliser le téléphone/l'e-mail\")]"
     ).click())
     try_action("Lien 'Connexion email'", lambda: driver.find_element(
         "xpath", "//a[contains(@href,'/login/phone-or-email/email')]"
     ).click())
-
     def fill_email():
         email_input = driver.find_element("xpath", "//input[@placeholder=\"E-mail ou nom d'utilisateur\"]")
         email_input.clear()
         email_input.send_keys(EMAIL_LOGIN_TIKTOK)
     try_action("Remplissage Email", fill_email)
-
     def fill_password():
         password_input = driver.find_element("xpath", "//input[@placeholder='Mot de passe']")
         password_input.clear()
         password_input.send_keys(EMAIL_PASSWORD_TIKTOK)
     try_action("Remplissage Mot de passe", fill_password)
-
     try_action("Bouton 'Se connecter' final", lambda: driver.find_element(
         "xpath", "//button[@data-e2e='login-button']"
     ).click())
+
+# ---------------- Rafraîchissement Live ----------------
+def refresh_live_loop():
+    global driver, current_live
+    while True:
+        time.sleep(REFRESH_INTERVAL)
+        try:
+            if driver:
+                live_url = driver.current_url
+                set_status("♻️ Rafraîchissement automatique du live...")
+                driver.get(live_url)
+                time.sleep(5)
+                set_status(f"✅ Live rechargé : {live_url}")
+                send_email_alert("Bot TikTok - Rafraîchissement", f"Le live a été rechargé : {live_url}")
+            else:
+                set_status("⚠️ Aucun driver actif pour rafraîchir le live.")
+        except Exception as e:
+            set_status(f"⚠️ Erreur refresh_live_loop : {e}")
+
+# ---------------- Envoi message TikTok ----------------
+def send_message_to_tiktok(msg):
+    global driver
+    if driver:
+        try:
+            chat_box = driver.find_element(
+                "xpath",
+                "//div[@contenteditable='plaintext-only' and @placeholder='Saisis ton message...']"
+            )
+            chat_box.click()
+            chat_box.send_keys(msg)
+            chat_box.send_keys(Keys.ENTER)
+            set_status(f"💬 Message envoyé : {msg}")
+        except Exception as e:
+            set_status(f"⚠️ Erreur envoi message : {e}")
+    else:
+        set_status("⚠️ Driver non lancé, impossible d'envoyer le message.")
+
+# ---------------- Tkinter ----------------
+def launch_tkinter_control():
+    global running, bot_start_time, likes_sent
+
+    root = tk.Tk()
+    root.title("🖥️ Contrôle TikTok Bot")
+    root.geometry("450x300")
+    root.configure(bg="#1e1e2f")
+    
+    btn_style = {"bg": "#00f2ea", "fg": "#121212", "font": ("Arial", 12, "bold"), "width": 15, "bd": 0, "activebackground": "#00bfb3"}
+    label_style = {"bg": "#1e1e2f", "fg": "#00f2ea", "font": ("Arial", 12, "bold")}
+    
+    tk.Label(root, text="🚀 Panel de contrôle TikTok Bot", **label_style).pack(pady=10)
+
+    tk.Label(root, text="Message à envoyer :", **label_style).pack(pady=(10, 0))
+    msg_entry = tk.Entry(root, font=("Arial", 12), width=40, bd=2, relief="groove")
+    msg_entry.pack(pady=5)
+
+    def on_send():
+        msg = msg_entry.get()
+        if msg.strip():
+            send_message_to_tiktok(msg)
+            msg_entry.delete(0, tk.END)
+    tk.Button(root, text="💬 Envoyer", command=on_send, **btn_style).pack(pady=5)
+
+    def start_autolike():
+        global running, bot_start_time
+        running = True
+        if not bot_start_time:
+            bot_start_time = time.time()
+        set_status("▶️ Auto-like démarré")
+    
+    def stop_autolike():
+        global running
+        running = False
+        set_status("⏸️ Auto-like arrêté")
+    
+    btn_frame = tk.Frame(root, bg="#1e1e2f")
+    btn_frame.pack(pady=10)
+    tk.Button(btn_frame, text="▶️ Démarrer Auto-like", command=start_autolike, **btn_style).grid(row=0, column=0, padx=5)
+    tk.Button(btn_frame, text="⏸️ Arrêter Auto-like", command=stop_autolike, **btn_style).grid(row=0, column=1, padx=5)
+
+    stat_frame = tk.Frame(root, bg="#121212")
+    stat_frame.pack(pady=10, fill="x")
+    stat_frame.configure(bd=2, relief="groove")
+    
+    tk.Label(stat_frame, text="📊 Statistiques", **label_style).pack(pady=5)
+    likes_label = tk.Label(stat_frame, text=f"Likes envoyés : {likes_sent}", **label_style)
+    likes_label.pack()
+    uptime_label = tk.Label(stat_frame, text="Temps de fonctionnement : 0s", **label_style)
+    uptime_label.pack()
+
+    def update_stats():
+        while True:
+            if bot_start_time:
+                uptime = int(time.time() - bot_start_time)
+            else:
+                uptime = 0
+            likes_label.config(text=f"Likes envoyés : {likes_sent}")
+            uptime_label.config(text=f"Temps de fonctionnement : {uptime}s")
+            time.sleep(1)
+
+    threading.Thread(target=update_stats, daemon=True).start()
+
+    root.mainloop()
 
 # ---------------- Fonction Clear Terminal ----------------
 def clear_terminal():
@@ -301,7 +384,6 @@ HTML_PAGE = """
     <h3 id="status">Status: En attente...</h3>
     <script>
         setInterval(function(){
-            // On ajoute un timestamp pour éviter le cache
             fetch("/status?_=" + new Date().getTime())
                 .then(res => res.json())
                 .then(data => {
@@ -344,7 +426,6 @@ def control():
     global running, current_live, driver
     action = request.form.get("action")
     live_url = request.form.get("live_url")
-
     if action == "start":
         toggle_running()
     elif action == "stop":
@@ -372,23 +453,11 @@ def launch_ngrok():
 
 # ---------------- Lancement ----------------
 if __name__ == "__main__":
-    auto_update()  # 🔥 Vérifie l’update au lancement
-
-    flask_thread = threading.Thread(target=lambda: app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False))
+    flask_thread = threading.Thread(target=lambda: app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False), daemon=True)
     flask_thread.start()
-    time.sleep(3)
-
     threading.Thread(target=launch_ngrok, daemon=True).start()
-    threading.Thread(target=launch_driver).start()
-    threading.Thread(target=auto_like, daemon=True).start()
+    threading.Thread(target=launch_tkinter_control, daemon=True).start()
     threading.Thread(target=clear_terminal, daemon=True).start()
-
-    keyboard.add_hotkey("F8", toggle_running)
-
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        set_status("❌ Fermeture du bot...")
-        close_driver()
-        sys.exit()
+    threading.Thread(target=refresh_live_loop, daemon=True).start()
+    launch_driver()
+    auto_like()
