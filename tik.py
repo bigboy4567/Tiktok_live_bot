@@ -15,6 +15,7 @@ import json
 import requests
 import subprocess
 import tkinter as tk
+from tkinter import ttk, messagebox, simpledialog  # Ajout des imports nécessaires
 import psutil
 import matplotlib
 matplotlib.use("TkAgg")
@@ -27,7 +28,7 @@ bandwidth_data = {"time": [], "upload": [], "download": []}
 
 # ---------------- CONFIG JSON ----------------
 script_dir = os.path.dirname(os.path.abspath(__file__))
-config_path = os.path.join(script_dir, "config_example.json")
+config_path = os.path.join(script_dir, "config.json")
 
 with open(config_path, "r") as f:
     config = json.load(f)
@@ -53,6 +54,11 @@ HUMAN_DELAYS = config["HUMAN_DELAYS"]
 
 REFRESH_INTERVAL = 20 * 60  # 20 minutes
 
+# ---------------- AUTO-MESSAGES CONFIG ----------------
+# Charger les messages depuis le config, mais ils seront modifiables dans l'interface
+AUTO_MESSAGES = config.get("AUTO_MESSAGES", [])
+ENABLE_AUTO_MESSAGES = config.get("ENABLE_AUTO_MESSAGES", False)
+
 running = False
 driver = None
 current_live = "https://www.tiktok.com/"
@@ -63,6 +69,22 @@ status_message = "Bot en attente..."
 likes_sent = 0
 bot_start_time = None
 next_pause_time = None
+
+def save_config_to_json():
+    """Sauvegarde la configuration actuelle dans le fichier JSON"""
+    global config, AUTO_MESSAGES, ENABLE_AUTO_MESSAGES
+    try:
+        # Mettre à jour les messages dans la config
+        config["AUTO_MESSAGES"] = AUTO_MESSAGES
+        config["ENABLE_AUTO_MESSAGES"] = ENABLE_AUTO_MESSAGES
+        
+        with open(config_path, 'w', encoding='utf-8') as f:
+            json.dump(config, f, indent=4, ensure_ascii=False)
+        set_status("✅ Configuration sauvegardée dans le JSON")
+        return True
+    except Exception as e:
+        set_status(f"⚠️ Erreur sauvegarde JSON : {e}")
+        return False
 
 # ---------------- Gestion Status ----------------
 def set_status(msg):
@@ -102,7 +124,7 @@ def try_action(description, func, retries=3, wait=2, fatal=True):
             set_status(f"⚠️ {description} échouée (tentative {attempt}): {e}")
             time.sleep(wait)
     if fatal:
-        send_email_alert("⚠️ Bot TikTok - Échec critique", f"L’étape '{description}' a échoué après {retries} tentatives.")
+        send_email_alert("⚠️ Bot TikTok - Échec critique", f"L'étape '{description}' a échoué après {retries} tentatives.")
     return False
 
 def get_bandwidth():
@@ -187,6 +209,19 @@ def auto_like():
         else:
             time.sleep(0.1)
 
+# ---------------- Auto Messages ----------------
+def auto_message_loop():
+    global ENABLE_AUTO_MESSAGES, AUTO_MESSAGES
+    while True:
+        if ENABLE_AUTO_MESSAGES and driver and AUTO_MESSAGES:
+            msg = random.choice(AUTO_MESSAGES)
+            send_message_to_tiktok(msg)
+            delay = random.randint(config["AUTO_MESSAGE_DELAY_MIN"], config["AUTO_MESSAGE_DELAY_MAX"])
+            set_status(f"💬 Prochain auto-message dans {delay}s")
+            time.sleep(delay)
+        else:
+            time.sleep(1)
+
 def launch_driver():
     global driver, current_live
     if driver:
@@ -201,7 +236,7 @@ def launch_driver():
     time.sleep(3)
     driver.refresh()
     set_status("🔄 Page rafraîchie")
-    time.sleep(10)
+    time.sleep(7)
     try_action("Bouton 'Se connecter'", lambda: driver.find_element(
         "xpath", "//div[text()='Se connecter']/ancestor::button"
     ).click())
@@ -261,71 +296,251 @@ def send_message_to_tiktok(msg):
     else:
         set_status("⚠️ Driver non lancé, impossible d'envoyer le message.")
 
-# ---------------- Tkinter ----------------
+# ---------------- Tkinter avec onglets ----------------
 def launch_tkinter_control():
-    global running, bot_start_time, likes_sent
+    global running, bot_start_time, likes_sent, ENABLE_AUTO_MESSAGES, AUTO_MESSAGES
 
     root = tk.Tk()
     root.title("🖥️ Contrôle TikTok Bot")
-    root.geometry("450x300")
+    root.geometry("600x630")  # Taille agrandie pour les onglets
     root.configure(bg="#1e1e2f")
     
-    btn_style = {"bg": "#00f2ea", "fg": "#121212", "font": ("Arial", 12, "bold"), "width": 15, "bd": 0, "activebackground": "#00bfb3"}
-    label_style = {"bg": "#1e1e2f", "fg": "#00f2ea", "font": ("Arial", 12, "bold")}
-    
+    btn_style = {"bg": "#00f2ea", "fg": "#121212", "font": ("Arial", 10, "bold"), "width": 18, "bd": 0, "activebackground": "#00bfb3"}
+    label_style = {"bg": "#1e1e2f", "fg": "#00f2ea", "font": ("Arial", 11, "bold")}
+
+    # Header principal
     tk.Label(root, text="🚀 Panel de contrôle TikTok Bot", **label_style).pack(pady=10)
 
-    tk.Label(root, text="Message à envoyer :", **label_style).pack(pady=(10, 0))
-    msg_entry = tk.Entry(root, font=("Arial", 12), width=40, bd=2, relief="groove")
-    msg_entry.pack(pady=5)
+    # Création du notebook (système d'onglets)
+    style = ttk.Style()
+    style.theme_use('default')
+    style.configure('TNotebook.Tab', background='#2d2d44', foreground='#00f2ea', padding=[15, 8])
+    style.configure('TNotebook', background='#1e1e2f', borderwidth=0)
+    style.map('TNotebook.Tab', background=[('selected', '#00f2ea')], foreground=[('selected', '#121212')])
+
+    notebook = ttk.Notebook(root)
+    notebook.pack(expand=True, fill='both', padx=10, pady=10)
+
+    # ========== ONGLET 1: CONTRÔLE PRINCIPAL ==========
+    main_frame = tk.Frame(notebook, bg="#1e1e2f")
+    notebook.add(main_frame, text="   🎮 Contrôle   ")
+
+    # Message entry + send
+    tk.Label(main_frame, text="Message à envoyer :", **label_style).pack(pady=(15, 5))
+    msg_entry = tk.Entry(main_frame, font=("Arial", 11), width=50, bd=2, relief="groove")
+    msg_entry.pack(pady=6)
 
     def on_send():
         msg = msg_entry.get()
         if msg.strip():
             send_message_to_tiktok(msg)
             msg_entry.delete(0, tk.END)
-    tk.Button(root, text="💬 Envoyer", command=on_send, **btn_style).pack(pady=5)
+    tk.Button(main_frame, text="💬 Envoyer", command=on_send, **btn_style).pack(pady=6)
 
-    def start_autolike():
+    # Auto-like controls
+    btn_frame = tk.Frame(main_frame, bg="#1e1e2f")
+    btn_frame.pack(pady=15)
+    tk.Button(btn_frame, text="▶️ Démarrer Auto-like", command=lambda: set_running(True), **btn_style).grid(row=0, column=0, padx=6, pady=4)
+    tk.Button(btn_frame, text="⏸️ Arrêter Auto-like", command=lambda: set_running(False), **btn_style).grid(row=0, column=1, padx=6, pady=4)
+
+    def set_running(val: bool):
         global running, bot_start_time
-        running = True
-        if not bot_start_time:
+        running = val
+        if running and not bot_start_time:
             bot_start_time = time.time()
-        set_status("▶️ Auto-like démarré")
-    
-    def stop_autolike():
-        global running
-        running = False
-        set_status("⏸️ Auto-like arrêté")
-    
-    btn_frame = tk.Frame(root, bg="#1e1e2f")
-    btn_frame.pack(pady=10)
-    tk.Button(btn_frame, text="▶️ Démarrer Auto-like", command=start_autolike, **btn_style).grid(row=0, column=0, padx=5)
-    tk.Button(btn_frame, text="⏸️ Arrêter Auto-like", command=stop_autolike, **btn_style).grid(row=0, column=1, padx=5)
+        set_status("▶️ Auto-like démarré" if running else "⏸️ Auto-like arrêté")
 
-    stat_frame = tk.Frame(root, bg="#121212")
-    stat_frame.pack(pady=10, fill="x")
+    # Auto-messages checkbox
+    auto_var = tk.BooleanVar(value=ENABLE_AUTO_MESSAGES)
+    def on_auto_toggle(*args):
+        global ENABLE_AUTO_MESSAGES
+        ENABLE_AUTO_MESSAGES = auto_var.get()
+        save_config_to_json()  # ← AJOUT ICI
+        set_status(f"🔁 Auto-messages {'activés' if ENABLE_AUTO_MESSAGES else 'désactivés'} et sauvegardé")
+
+    auto_var.trace_add("write", on_auto_toggle)
+    chk = tk.Checkbutton(main_frame, text="Activer l'envoi auto de messages", variable=auto_var, bg="#1e1e2f", fg="#00f2ea", selectcolor="#1e1e2f", font=("Arial", 10, "bold"))
+    chk.pack(pady=12)
+
+    # Stats card
+    stat_frame = tk.Frame(main_frame, bg="#121212")
+    stat_frame.pack(pady=8, fill="x", padx=10)
     stat_frame.configure(bd=2, relief="groove")
-    
-    tk.Label(stat_frame, text="📊 Statistiques", **label_style).pack(pady=5)
-    likes_label = tk.Label(stat_frame, text=f"Likes envoyés : {likes_sent}", **label_style)
-    likes_label.pack()
-    uptime_label = tk.Label(stat_frame, text="Temps de fonctionnement : 0s", **label_style)
-    uptime_label.pack()
 
+    tk.Label(stat_frame, text="📊 Statistiques", bg="#121212", fg="#00f2ea", font=("Arial", 11, "bold")).pack(pady=6)
+    likes_label = tk.Label(stat_frame, text=f"Likes envoyés : {likes_sent}", bg="#121212", fg="#00f2ea", font=("Arial", 10))
+    likes_label.pack()
+    uptime_label = tk.Label(stat_frame, text="Temps de fonctionnement : 0s", bg="#121212", fg="#00f2ea", font=("Arial", 10))
+    uptime_label.pack()
+    next_pause_label = tk.Label(stat_frame, text="Prochaine pause : -", bg="#121212", fg="#00f2ea", font=("Arial", 10))
+    next_pause_label.pack()
+    auto_status_label = tk.Label(stat_frame, text=f"Auto-messages : {'ON' if ENABLE_AUTO_MESSAGES else 'OFF'}", bg="#121212", fg="#00f2ea", font=("Arial", 10))
+    auto_status_label.pack(pady=(4,8))
+
+    # ========== ONGLET 2: GESTION DES MESSAGES ==========
+    messages_frame = tk.Frame(notebook, bg="#1e1e2f")
+    notebook.add(messages_frame, text="   💬 Messages   ")
+
+    tk.Label(messages_frame, text="🎯 Gestion des Messages Automatiques", **label_style).pack(pady=(15, 10))
+
+    # Frame pour la liste et les boutons
+    list_frame = tk.Frame(messages_frame, bg="#1e1e2f")
+    list_frame.pack(fill="both", expand=True, padx=15, pady=10)
+
+    # Listbox avec scrollbar pour afficher les messages
+    list_container = tk.Frame(list_frame, bg="#1e1e2f")
+    list_container.pack(fill="both", expand=True)
+
+    scrollbar = tk.Scrollbar(list_container)
+    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+    messages_listbox = tk.Listbox(
+        list_container, 
+        yscrollcommand=scrollbar.set,
+        bg="#121212", 
+        fg="#00f2ea", 
+        selectbackground="#00f2ea",
+        selectforeground="#121212",
+        font=("Arial", 9),
+        height=12
+    )
+    messages_listbox.pack(side=tk.LEFT, fill="both", expand=True)
+    scrollbar.config(command=messages_listbox.yview)
+
+    # Fonction pour rafraîchir la liste des messages
+    def refresh_messages_list():
+        messages_listbox.delete(0, tk.END)
+        for i, msg in enumerate(AUTO_MESSAGES, 1):
+            # Tronquer le message si trop long pour l'affichage
+            display_msg = msg[:60] + "..." if len(msg) > 60 else msg
+            messages_listbox.insert(tk.END, f"{i}. {display_msg}")
+
+    # Boutons de gestion
+    btn_frame_messages = tk.Frame(messages_frame, bg="#1e1e2f")
+    btn_frame_messages.pack(pady=10)
+
+    def add_message():
+        global AUTO_MESSAGES
+        new_msg = simpledialog.askstring("Nouveau Message", "Entrez le nouveau message :", parent=root)
+        if new_msg and new_msg.strip():
+            AUTO_MESSAGES.append(new_msg.strip())
+            refresh_messages_list()
+            save_config_to_json()  # ← AJOUT ICI
+            set_status(f"✅ Message ajouté et sauvegardé : {new_msg[:30]}...")
+
+    def edit_message():
+        global AUTO_MESSAGES
+        selection = messages_listbox.curselection()
+        if not selection:
+            messagebox.showwarning("Sélection", "Veuillez sélectionner un message à modifier.")
+            return
+        
+        index = selection  # ← CORRECTION ICI : extraction de l'index du tuple
+        current_msg = AUTO_MESSAGES[index]
+        new_msg = simpledialog.askstring("Modifier Message", "Modifiez le message :", initialvalue=current_msg, parent=root)
+        if new_msg is not None and new_msg.strip():
+            AUTO_MESSAGES[index] = new_msg.strip()
+            refresh_messages_list()
+            save_config_to_json()
+            set_status(f"✅ Message modifié et sauvegardé")
+
+    def delete_message():
+        global AUTO_MESSAGES
+        selection = messages_listbox.curselection()
+        if not selection:
+            messagebox.showwarning("Sélection", "Veuillez sélectionner un message à supprimer.")
+            return
+        
+        if messagebox.askyesno("Confirmation", "Êtes-vous sûr de vouloir supprimer ce message ?"):
+            index = selection  # ← CORRECTION ICI : extraction de l'index du tuple
+            del AUTO_MESSAGES[index]
+            refresh_messages_list()
+            save_config_to_json()
+            set_status("🗑️ Message supprimé et sauvegardé")
+
+    def clear_all_messages():
+        global AUTO_MESSAGES
+        if messagebox.askyesno("Confirmation", "Êtes-vous sûr de vouloir supprimer TOUS les messages ?"):
+            AUTO_MESSAGES.clear()
+            refresh_messages_list()
+            save_config_to_json()  # ← AJOUT ICI
+            set_status("🗑️ Tous les messages supprimés et sauvegardés")
+
+    # Boutons d'action
+    tk.Button(btn_frame_messages, text="➕ Ajouter", command=add_message, **btn_style).grid(row=0, column=0, padx=5)
+    tk.Button(btn_frame_messages, text="✏️ Modifier", command=edit_message, **btn_style).grid(row=0, column=1, padx=5)
+    tk.Button(btn_frame_messages, text="🗑️ Supprimer", command=delete_message, **btn_style).grid(row=0, column=2, padx=5)
+    tk.Button(btn_frame_messages, text="🧹 Tout effacer", command=clear_all_messages, **btn_style).grid(row=1, column=0, columnspan=3, pady=8)
+
+    # Informations
+    info_frame = tk.Frame(messages_frame, bg="#121212", bd=1, relief="solid")
+    info_frame.pack(fill="x", padx=15, pady=5)
+    
+    messages_count_label = tk.Label(info_frame, text=f"Messages configurés : {len(AUTO_MESSAGES)}", bg="#121212", fg="#00f2ea", font=("Arial", 9))
+    messages_count_label.pack(pady=5)
+
+    # Initialiser la liste des messages
+    refresh_messages_list()
+
+    # Bandwidth miniature plot 
+    fig = Figure(figsize=(5.5, 1.2), dpi=80)
+    ax = fig.add_subplot(111)
+    ax.set_ylim(0, 100)
+    ax.set_title("Upload / Download (KB/s)", fontsize=8)
+    ax.get_xaxis().set_visible(False)
+    canvas = FigureCanvasTkAgg(fig, master=main_frame)
+    canvas.get_tk_widget().pack(pady=(2,6))
+
+    # Update stats loop
     def update_stats():
+        global likes_sent, bot_start_time, next_pause_time
         while True:
-            if bot_start_time:
-                uptime = int(time.time() - bot_start_time)
-            else:
-                uptime = 0
-            likes_label.config(text=f"Likes envoyés : {likes_sent}")
-            uptime_label.config(text=f"Temps de fonctionnement : {uptime}s")
-            time.sleep(1)
+            try:
+                if bot_start_time:
+                    uptime = int(time.time() - bot_start_time)
+                else:
+                    uptime = 0
+                likes_label.config(text=f"Likes envoyés : {likes_sent}")
+                uptime_label.config(text=f"Temps de fonctionnement : {uptime}s")
+                if next_pause_time:
+                    remaining = int(next_pause_time - time.time())
+                    if remaining < 0:
+                        remaining = 0
+                    next_pause_label.config(text=f"Prochaine pause : {remaining}s")
+                else:
+                    next_pause_label.config(text="Prochaine pause : -")
+                auto_status_label.config(text=f"Auto-messages : {'ON' if ENABLE_AUTO_MESSAGES else 'OFF'}")
+                messages_count_label.config(text=f"Messages configurés : {len(AUTO_MESSAGES)}")
+
+                # update bandwidth plot data
+                try:
+                    up, down = get_bandwidth()
+                    bandwidth_data["time"].append(time.time())
+                    bandwidth_data["upload"].append(up)
+                    bandwidth_data["download"].append(down)
+                    if len(bandwidth_data["upload"]) > 30:
+                        bandwidth_data["upload"].pop(0)
+                        bandwidth_data["download"].pop(0)
+                        bandwidth_data["time"].pop(0)
+                    ax.clear()
+                    ax.plot(bandwidth_data["upload"], label="up")
+                    ax.plot(bandwidth_data["download"], label="down")
+                    ax.set_ylim(0, max(100, max(bandwidth_data["upload"] + bandwidth_data["download"] + [0])))
+                    ax.get_xaxis().set_visible(False)
+                    ax.legend(loc="upper right", fontsize=6)
+                    canvas.draw()
+                except Exception:
+                    pass
+
+                time.sleep(1)
+            except Exception:
+                time.sleep(1)
 
     threading.Thread(target=update_stats, daemon=True).start()
 
     root.mainloop()
+
+# [Toutes les autres fonctions restent identiques...]
 
 # ---------------- Fonction Clear Terminal ----------------
 def clear_terminal():
@@ -347,6 +562,7 @@ def close_driver():
 # ---------------- Flask ----------------
 app = Flask(__name__)
 
+# ---------------- Flask (partie complète) ----------------
 HTML_PAGE = """
 <!DOCTYPE html>
 <html lang="fr">
@@ -362,6 +578,7 @@ HTML_PAGE = """
         input { padding: 10px; margin: 10px; border-radius: 6px; border: none; width: 80%; max-width: 400px; }
         .card { background: #1e1e2f; padding: 20px; border-radius: 10px; margin-top: 20px; }
         #status { margin-top: 20px; font-size: 18px; }
+        label { display: block; margin: 10px; }
     </style>
 </head>
 <body>
@@ -373,6 +590,11 @@ HTML_PAGE = """
             <br>
             <input type="text" name="live_url" placeholder="Lien TikTok Live">
             <button class="btn" name="action" value="change_live">🌐 Changer Live</button>
+            <br>
+            <label>
+                <input type="checkbox" name="auto_messages" onchange="this.form.submit()" {{'checked' if auto_messages else ''}}>
+                Activer l'envoi auto de messages
+            </label>
         </form>
     </div>
     <div class="card">
@@ -380,6 +602,8 @@ HTML_PAGE = """
         <p>Likes envoyés : <span id="likes">0</span></p>
         <p>Temps de fonctionnement : <span id="uptime">0s</span></p>
         <p>Prochaine pause prévue : <span id="next_pause">-</span></p>
+        <p>Auto-messages : <span id="auto_status">{{ 'ON' if auto_messages else 'OFF' }}</span></p>
+        <p>Messages configurés : <span id="message_count">{{ message_count }}</span></p>
     </div>
     <h3 id="status">Status: En attente...</h3>
     <script>
@@ -391,6 +615,8 @@ HTML_PAGE = """
                     document.getElementById("likes").innerText = data.likes;
                     document.getElementById("uptime").innerText = data.uptime;
                     document.getElementById("next_pause").innerText = data.next_pause;
+                    document.getElementById("auto_status").innerText = data.auto_messages ? "ON" : "OFF";
+                    document.getElementById("message_count").innerText = data.message_count;
                 });
         }, 2000);
     </script>
@@ -401,12 +627,12 @@ HTML_PAGE = """
 @app.route("/", methods=["GET"])
 @requires_auth
 def index():
-    return render_template_string(HTML_PAGE)
+    return render_template_string(HTML_PAGE, auto_messages=ENABLE_AUTO_MESSAGES, message_count=len(AUTO_MESSAGES))
 
 @app.route("/status", methods=["GET"])
 @requires_auth
 def status():
-    global likes_sent, bot_start_time, next_pause_time
+    global likes_sent, bot_start_time, next_pause_time, ENABLE_AUTO_MESSAGES, AUTO_MESSAGES
     uptime = "0s"
     if bot_start_time:
         uptime = f"{int(time.time()-bot_start_time)}s"
@@ -417,15 +643,23 @@ def status():
         "status": status_message,
         "likes": likes_sent,
         "uptime": uptime,
-        "next_pause": next_pause_str
+        "next_pause": next_pause_str,
+        "auto_messages": ENABLE_AUTO_MESSAGES,
+        "message_count": len(AUTO_MESSAGES)
     }
 
 @app.route("/control", methods=["POST"])
 @requires_auth
 def control():
-    global running, current_live, driver
+    global running, current_live, driver, ENABLE_AUTO_MESSAGES
     action = request.form.get("action")
     live_url = request.form.get("live_url")
+    auto_messages_toggle = request.form.get("auto_messages")
+
+    if auto_messages_toggle is not None:
+        ENABLE_AUTO_MESSAGES = not ENABLE_AUTO_MESSAGES
+        set_status(f"🔁 Auto-messages {'activés' if ENABLE_AUTO_MESSAGES else 'désactivés'}")
+
     if action == "start":
         toggle_running()
     elif action == "stop":
@@ -436,7 +670,7 @@ def control():
         if driver:
             driver.get(current_live)
         set_status(f"🌐 Live changé : {current_live}")
-    return render_template_string(HTML_PAGE)
+    return render_template_string(HTML_PAGE, auto_messages=ENABLE_AUTO_MESSAGES, message_count=len(AUTO_MESSAGES))
 
 # ---------------- Lancement ngrok ----------------
 def launch_ngrok():
@@ -459,5 +693,6 @@ if __name__ == "__main__":
     threading.Thread(target=launch_tkinter_control, daemon=True).start()
     threading.Thread(target=clear_terminal, daemon=True).start()
     threading.Thread(target=refresh_live_loop, daemon=True).start()
+    threading.Thread(target=auto_message_loop, daemon=True).start()
     launch_driver()
     auto_like()
