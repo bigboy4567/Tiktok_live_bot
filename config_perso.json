@@ -1,0 +1,17 @@
+{
+    "_comment": "===== CONFIG UTILISATEUR =====",
+    "USERNAME": "CHANGE ICI",
+    "PASSWORD": "CHANGE ICI",
+
+    "_comment_mail": "===== CONFIG EMAIL NOTIFS =====",
+    "EMAIL_SENDER": "CHANGE ICI",
+    "EMAIL_RECEIVER": "CHANGE ICI",
+    "EMAIL_PASSWORD": "CHANGE ICI",
+
+    "_comment_tiktok": "===== IDENTIFIANTS TIKTOK =====",
+    "EMAIL_LOGIN_TIKTOK": "CHANGE ICI",
+    "EMAIL_PASSWORD_TIKTOK": "CHANGE ICI",
+    
+    "_comment_openai": "===== OPENAI API KEY =====",
+    "OPENAI_API_KEY": "CHANGE ICI"
+}
