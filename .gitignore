@@ -1,5 +1,5 @@
 # Ignore le fichier de config sensible
-config.json
+config_perso.json
 
 # Ignore les caches Python
 __pycache__/
