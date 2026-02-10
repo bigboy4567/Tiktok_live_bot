@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Local runtime data
+.env
+bot.log
+ngrok.log
+
+# Browser profile and temp data
+chrome_profile/
+
+# Virtual environments
+.venv/
+venv/
+

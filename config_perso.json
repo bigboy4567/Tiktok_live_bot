@@ -1,0 +1,8 @@
+{
+    "_comment": "Surcharges locales non sensibles",
+    "AUTO_MESSAGES": [],
+    "ENABLE_AUTO_MESSAGES": false,
+    "ENABLE_TERMINAL_CLEAR": true,
+    "USE_CHROME_PROFILE": true,
+    "CHROME_PROFILE_DIR": "chrome_profile"
+}
