@@ -88,23 +88,23 @@ class CharLimitDialog(QDialog):
 class BotWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Controle TikTok Bot (PyQt6)")
+        self.setWindowTitle("Studio Control - TikTok Live Bot")
         self.resize(840, 900)
 
         app_instance = QApplication.instance()
         if app_instance is not None:
             app_instance.setStyle("Fusion")
             palette = QPalette()
-            palette.setColor(QPalette.ColorRole.Window, QColor(17, 17, 17))
-            palette.setColor(QPalette.ColorRole.Base, QColor(27, 27, 31))
-            palette.setColor(QPalette.ColorRole.AlternateBase, QColor(24, 24, 28))
-            palette.setColor(QPalette.ColorRole.WindowText, QColor(234, 234, 234))
-            palette.setColor(QPalette.ColorRole.Text, QColor(234, 234, 234))
-            palette.setColor(QPalette.ColorRole.ButtonText, QColor(234, 234, 234))
-            palette.setColor(QPalette.ColorRole.ToolTipText, QColor(234, 234, 234))
-            palette.setColor(QPalette.ColorRole.Button, QColor(32, 32, 36))
-            palette.setColor(QPalette.ColorRole.Highlight, QColor(0, 242, 234))
-            palette.setColor(QPalette.ColorRole.HighlightedText, QColor(0, 0, 0))
+            palette.setColor(QPalette.ColorRole.Window, QColor(14, 18, 24))
+            palette.setColor(QPalette.ColorRole.Base, QColor(20, 27, 36))
+            palette.setColor(QPalette.ColorRole.AlternateBase, QColor(27, 35, 46))
+            palette.setColor(QPalette.ColorRole.WindowText, QColor(235, 241, 248))
+            palette.setColor(QPalette.ColorRole.Text, QColor(235, 241, 248))
+            palette.setColor(QPalette.ColorRole.ButtonText, QColor(235, 241, 248))
+            palette.setColor(QPalette.ColorRole.ToolTipText, QColor(235, 241, 248))
+            palette.setColor(QPalette.ColorRole.Button, QColor(29, 39, 53))
+            palette.setColor(QPalette.ColorRole.Highlight, QColor(255, 129, 69))
+            palette.setColor(QPalette.ColorRole.HighlightedText, QColor(12, 12, 12))
             app_instance.setPalette(palette)
 
         self.setStyleSheet(self._qss())
@@ -114,11 +114,11 @@ class BotWindow(QMainWindow):
         self.setCentralWidget(self.tabs)
 
         self.tab_control = QWidget()
-        self.tabs.addTab(self.tab_control, "Controle")
+        self.tabs.addTab(self.tab_control, "Pilotage")
         self._build_control_tab()
 
         self.tab_messages = QWidget()
-        self.tabs.addTab(self.tab_messages, "Messages")
+        self.tabs.addTab(self.tab_messages, "Bibliotheque")
         self._build_messages_tab()
 
         self.ui_timer = QTimer(self)
@@ -156,26 +156,26 @@ class BotWindow(QMainWindow):
 
         self._header(
             base,
-            "Panel de controle TikTok Bot",
-            "Actions rapides et telemetrie en temps reel",
+            "Studio de Pilotage TikTok Live",
+            "Actions rapides, diffusion, telemetrie en temps reel",
         )
 
         card_send = self._card(base, "Envoi manuel")
         hl_msg = QHBoxLayout()
         self.msg_edit = QLineEdit()
         self.msg_edit.setPlaceholderText("Message a envoyer...")
-        btn_send = QPushButton("Envoyer")
+        btn_send = QPushButton("Envoyer maintenant")
         btn_send.setObjectName("accentButton")
         btn_send.clicked.connect(self.on_send_message)
         hl_msg.addWidget(self.msg_edit)
         hl_msg.addWidget(btn_send)
         card_send.addLayout(hl_msg)
 
-        card_like = self._card(base, "Auto-like")
+        card_like = self._card(base, "Moteur Auto-like")
         hl_btns = QHBoxLayout()
-        btn_start = QPushButton("Demarrer")
+        btn_start = QPushButton("Lancer")
         btn_start.setObjectName("accentButton")
-        btn_stop = QPushButton("Arreter")
+        btn_stop = QPushButton("Stop")
         btn_stop.setObjectName("dangerButton")
         btn_start.clicked.connect(lambda: self.set_running(True))
         btn_stop.clicked.connect(lambda: self.set_running(False))
@@ -183,17 +183,17 @@ class BotWindow(QMainWindow):
         hl_btns.addWidget(btn_stop)
         card_like.addLayout(hl_btns)
 
-        card_toggles = self._card(base, "Automations")
+        card_toggles = self._card(base, "Automatisation")
         self.chk_auto = QCheckBox("Activer l'envoi automatique de messages (liste)")
         self.chk_auto.setChecked(tik_backend.ENABLE_AUTO_MESSAGES)
         self.chk_auto.stateChanged.connect(self.on_toggle_auto_messages)
         card_toggles.addWidget(self.chk_auto)
 
-        card_stats = self._card(base, "Statistiques")
+        card_stats = self._card(base, "Statistiques Live")
         badges = QHBoxLayout()
         self.lbl_auto_status = QLabel("Auto-messages : OFF")
         self.lbl_auto_status.setObjectName("badge")
-        self.lbl_msg_count = QLabel("Messages configures : 0")
+        self.lbl_msg_count = QLabel("Messages prets : 0")
         self.lbl_msg_count.setObjectName("badge")
         badges.addWidget(self.lbl_auto_status)
         badges.addWidget(self.lbl_msg_count)
@@ -203,7 +203,7 @@ class BotWindow(QMainWindow):
         self.lbl_likes = QLabel("Likes envoyes : 0")
         self.lbl_uptime = QLabel("Temps de fonctionnement : 0s")
         self.lbl_next_pause = QLabel("Prochaine pause : -")
-        self.lbl_status = QLabel("Status: En attente...")
+        self.lbl_status = QLabel("Status: Pret")
         for lab in [self.lbl_likes, self.lbl_uptime, self.lbl_next_pause, self.lbl_status]:
             lab.setObjectName("statLine")
             grid.addWidget(lab)
@@ -212,12 +212,12 @@ class BotWindow(QMainWindow):
         self.fig = Figure(figsize=(6.6, 1.8), dpi=100)
         self.ax = self.fig.add_subplot(111)
         self.ax.set_ylim(0, 100)
-        self.ax.set_title("Upload / Download (KB/s)", fontsize=9, color="#eaeaea")
-        self.ax.set_facecolor("#1b1b1f")
+        self.ax.set_title("Upload / Download (KB/s)", fontsize=9, color="#d5deea")
+        self.ax.set_facecolor("#18222f")
         self.ax.get_xaxis().set_visible(False)
         for spine in self.ax.spines.values():
-            spine.set_color("#2a2a2a")
-        self.ax.tick_params(colors="#b7b7b7")
+            spine.set_color("#334357")
+        self.ax.tick_params(colors="#9cb0c9")
         self.canvas = FigureCanvasQTAgg(self.fig)
         card_stats.addWidget(self.canvas)
 
@@ -228,8 +228,8 @@ class BotWindow(QMainWindow):
 
         self._header(
             base,
-            "Gestion des Messages Automatiques",
-            "Ajouter, modifier et prioriser les messages",
+            "Atelier Messages Automatiques",
+            "Ajouter, modifier et organiser les reponses du bot",
         )
 
         card_info = self._card(base)
@@ -237,7 +237,7 @@ class BotWindow(QMainWindow):
         self.lbl_count.setObjectName("badge")
         card_info.addWidget(self.lbl_count)
 
-        card_list = self._card(base, "Messages")
+        card_list = self._card(base, "Messages Configures")
         self.list_messages = QListWidget()
         card_list.addWidget(self.list_messages)
         self.refresh_messages_list()
@@ -375,7 +375,7 @@ class BotWindow(QMainWindow):
             f"Auto-messages : {'ON' if tik_backend.ENABLE_AUTO_MESSAGES else 'OFF'}"
         )
         self.lbl_msg_count.setText(
-            f"Messages configures : {len(tik_backend.AUTO_MESSAGES)}"
+            f"Messages prets : {len(tik_backend.AUTO_MESSAGES)}"
         )
         self.lbl_status.setText(f"Status: {tik_backend.status_message}")
 
@@ -390,17 +390,17 @@ class BotWindow(QMainWindow):
                 tik_backend.bandwidth_data["time"].pop(0)
 
             self.ax.clear()
-            self.ax.set_facecolor("#1b1b1f")
+            self.ax.set_facecolor("#18222f")
             self.ax.plot(
                 tik_backend.bandwidth_data["upload"],
                 label="up",
-                color="#00f2ea",
+                color="#6be3ff",
                 linewidth=1.5,
             )
             self.ax.plot(
                 tik_backend.bandwidth_data["download"],
                 label="down",
-                color="#9f9f9f",
+                color="#ff9f5a",
                 linewidth=1.2,
                 linestyle="--",
             )
@@ -417,13 +417,13 @@ class BotWindow(QMainWindow):
             self.ax.legend(
                 loc="upper right",
                 fontsize=7,
-                facecolor="#1b1b1f",
-                edgecolor="#2a2a2a",
+                facecolor="#18222f",
+                edgecolor="#334357",
             )
             for spine in self.ax.spines.values():
-                spine.set_color("#2a2a2a")
-            self.ax.tick_params(colors="#b7b7b7")
-            self.ax.set_title("Upload / Download (KB/s)", fontsize=9, color="#eaeaea")
+                spine.set_color("#334357")
+            self.ax.tick_params(colors="#9cb0c9")
+            self.ax.set_title("Upload / Download (KB/s)", fontsize=9, color="#d5deea")
             self.canvas.draw_idle()
         except Exception:
             pass
@@ -431,97 +431,161 @@ class BotWindow(QMainWindow):
     def _qss(self):
         return """
         QWidget {
-            background-color: #111111;
-            color: #eaeaea;
+            color: #e9eef6;
             font-size: 13px;
+            font-family: "Bahnschrift", "Segoe UI Variable Text", "Segoe UI";
+            background: #0f141b;
+        }
+        QMainWindow {
+            background: qlineargradient(
+                x1:0, y1:0, x2:1, y2:1,
+                stop:0 #0f141b,
+                stop:0.55 #172333,
+                stop:1 #13202d
+            );
         }
         #pageTitle {
-            font-size: 20px;
+            font-size: 22px;
             font-weight: 700;
-            color: #00f2ea;
-            padding: 4px 0 2px 0;
+            color: #ffc48c;
+            letter-spacing: 0.3px;
+            padding: 6px 0 2px 0;
         }
         #pageSubtitle {
             font-size: 12px;
-            color: #b7b7b7;
+            color: #a9bbcf;
         }
         QTabWidget::pane {
-            border: 1px solid #2a2a2a;
-            border-radius: 10px;
-            margin-top: 8px;
-            background: #1b1b1f;
+            border: 1px solid #32475f;
+            border-radius: 14px;
+            margin-top: 10px;
+            background: rgba(12, 18, 26, 0.88);
         }
         QTabBar::tab {
-            padding: 8px 14px;
-            margin-right: 6px;
-            color: #cfcfcf;
-            background: transparent;
-            border: 1px solid transparent;
-            border-top-left-radius: 8px;
-            border-top-right-radius: 8px;
+            padding: 9px 16px;
+            margin-right: 8px;
+            color: #b5c6db;
+            background: rgba(22, 34, 47, 0.65);
+            border: 1px solid #2a3a4d;
+            border-top-left-radius: 10px;
+            border-top-right-radius: 10px;
+        }
+        QTabBar::tab:hover {
+            color: #edf3fb;
+            border-color: #486381;
+            background: rgba(30, 44, 60, 0.85);
         }
         QTabBar::tab:selected {
-            color: #ffffff;
-            background: #1b1b1f;
-            border: 1px solid #2a2a2a;
-            border-bottom: 2px solid #00f2ea;
+            color: #f8fcff;
+            background: rgba(19, 29, 41, 0.95);
+            border: 1px solid #4d6785;
+            border-bottom: 3px solid #ff8f52;
         }
         #card {
-            background: #1b1b1f;
-            border: 1px solid #2a2a2a;
-            border-radius: 12px;
+            background: qlineargradient(
+                x1:0, y1:0, x2:1, y2:1,
+                stop:0 rgba(20, 30, 41, 0.95),
+                stop:1 rgba(15, 23, 33, 0.95)
+            );
+            border: 1px solid #33485f;
+            border-radius: 14px;
         }
         #cardTitle {
             font-size: 14px;
-            font-weight: 600;
-            color: #eaeaea;
-            margin-bottom: 2px;
+            font-weight: 700;
+            color: #f6b27b;
+            margin-bottom: 3px;
         }
         QLabel#badge {
-            background: rgba(0,242,234,0.12);
-            color: #aef7f4;
-            border: 1px solid rgba(0,242,234,0.35);
+            background: rgba(255, 143, 82, 0.14);
+            color: #ffd8bd;
+            border: 1px solid rgba(255, 143, 82, 0.45);
             border-radius: 10px;
-            padding: 4px 8px;
+            padding: 5px 9px;
         }
         QLabel#statLine {
-            color: #a8a8a8;
+            color: #bdd0e3;
         }
         QLineEdit {
-            background: #17171a;
-            border: 1px solid #2a2a2a;
-            border-radius: 10px;
-            padding: 8px 10px;
-            selection-background-color: #00f2ea;
-            selection-color: #000000;
+            background: rgba(16, 24, 35, 0.95);
+            border: 1px solid #3a4f66;
+            border-radius: 11px;
+            padding: 9px 11px;
+            selection-background-color: #ff8f52;
+            selection-color: #111111;
+        }
+        QLineEdit:focus {
+            border: 1px solid #77d8ff;
+            background: rgba(14, 22, 32, 0.98);
         }
         QListWidget {
-            background: #17171a;
-            border: 1px solid #2a2a2a;
-            border-radius: 10px;
-            padding: 6px;
+            background: rgba(15, 23, 33, 0.92);
+            border: 1px solid #38506a;
+            border-radius: 11px;
+            padding: 7px;
+        }
+        QListWidget::item {
+            padding: 5px 6px;
+            border-radius: 7px;
+        }
+        QListWidget::item:selected {
+            background: rgba(107, 227, 255, 0.2);
+            color: #eef7ff;
+        }
+        QCheckBox {
+            spacing: 8px;
+            color: #d6e3f2;
+        }
+        QCheckBox::indicator {
+            width: 18px;
+            height: 18px;
+            border-radius: 4px;
+            border: 1px solid #44607d;
+            background: #1a2938;
+        }
+        QCheckBox::indicator:checked {
+            background: #ff8f52;
+            border-color: #ff8f52;
         }
         QPushButton {
-            border: 1px solid #2a2a2a;
-            border-radius: 10px;
-            padding: 8px 12px;
-            background: #202024;
-            color: #eaeaea;
+            border: 1px solid #3f566f;
+            border-radius: 11px;
+            padding: 8px 13px;
+            background: #223244;
+            color: #eaf1f9;
+            font-weight: 600;
+        }
+        QPushButton:hover {
+            background: #2c4158;
+            border-color: #577596;
+        }
+        QPushButton:pressed {
+            background: #1d2b3b;
         }
         QPushButton#accentButton {
-            background: #00f2ea;
-            color: #000000;
-            border-color: #00c9c3;
+            background: #ff8f52;
+            color: #151515;
+            border-color: #ffb27d;
+            font-weight: 700;
+        }
+        QPushButton#accentButton:hover {
+            background: #ffa36b;
         }
         QPushButton#dangerButton {
-            background: #2a191b;
-            color: #ffb3b8;
-            border-color: #5a2a2f;
+            background: #47262b;
+            color: #ffd8d8;
+            border-color: #8b4e58;
+        }
+        QPushButton#dangerButton:hover {
+            background: #5a2f35;
         }
         QPushButton#ghostButton {
-            background: transparent;
-            color: #cfcfcf;
-            border-color: #2a2a2a;
+            background: rgba(26, 40, 56, 0.25);
+            color: #cfdef0;
+            border-color: #3d5672;
+        }
+        QPushButton#ghostButton:hover {
+            background: rgba(44, 65, 88, 0.45);
         }
         """
 
@@ -541,28 +605,172 @@ HTML_PAGE = """
     <title>Bot TikTok</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body { font-family: Arial, sans-serif; background: #121212; color: #f5f5f5; text-align: center; margin:0; padding:20px; }
-        h1 { color: #00f2ea; }
-        h2 { color: #00f2ea; margin-top: 30px; }
-        .btn { background: #00f2ea; border: none; padding: 12px 20px; margin: 5px; border-radius: 6px; cursor: pointer; font-size: 16px; transition: 0.3s; color: #121212; }
-        .btn:hover { background: #00bfb3; }
-        .btn-danger { background: #ff4757; color: white; }
-        .btn-danger:hover { background: #ff3838; }
-        .btn-small { padding: 8px 12px; font-size: 14px; margin: 2px; }
-        input, textarea { padding: 10px; margin: 10px; border-radius: 6px; border: none; width: 80%; max-width: 400px; background: #1e1e2f; color: #f5f5f5; }
-        .card { background: #1e1e2f; padding: 20px; border-radius: 10px; margin-top: 20px; }
-        #status { margin-top: 20px; font-size: 18px; }
-        label { display: block; margin: 10px; }
-        .message-list { max-height: 300px; overflow-y: auto; background: #121212; border-radius: 6px; padding: 10px; margin: 10px 0; text-align: left; }
-        .message-item { background: #1e1e2f; padding: 10px; margin: 5px 0; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; }
-        .message-text { flex-grow: 1; margin-right: 10px; word-break: break-word; }
-        .message-actions { display: flex; gap: 5px; }
-        .input-group { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 10px 0; }
-        .input-group input { margin: 0; }
+        :root {
+            --bg-0: #0e141d;
+            --bg-1: #1a2a3a;
+            --panel: rgba(19, 30, 43, 0.9);
+            --panel-border: #3a546f;
+            --text: #e8f0fa;
+            --muted: #b4c7dd;
+            --accent: #ff8f52;
+            --accent-2: #6be3ff;
+            --danger: #e15b6a;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: "Bahnschrift", "Segoe UI Variable Text", "Trebuchet MS", sans-serif;
+            margin: 0;
+            padding: 24px 14px 30px 14px;
+            color: var(--text);
+            text-align: center;
+            min-height: 100vh;
+            background:
+                radial-gradient(circle at 8% 4%, rgba(107, 227, 255, 0.16), transparent 30%),
+                radial-gradient(circle at 92% 10%, rgba(255, 143, 82, 0.2), transparent 32%),
+                linear-gradient(130deg, var(--bg-0) 0%, var(--bg-1) 100%);
+        }
+        h1 {
+            color: #ffc69a;
+            font-size: clamp(28px, 4.5vw, 44px);
+            letter-spacing: 0.5px;
+            margin: 0 0 14px 0;
+        }
+        h2 {
+            color: #ffd8bd;
+            margin-top: 0;
+        }
+        .card {
+            width: min(980px, 100%);
+            margin: 0 auto 18px auto;
+            padding: 20px;
+            border-radius: 16px;
+            background: var(--panel);
+            border: 1px solid var(--panel-border);
+            backdrop-filter: blur(3px);
+            box-shadow: 0 14px 28px rgba(7, 12, 18, 0.35);
+        }
+        .btn {
+            border: 1px solid transparent;
+            padding: 11px 16px;
+            margin: 5px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 15px;
+            transition: 0.22s ease;
+            background: var(--accent);
+            color: #151515;
+            font-weight: 700;
+        }
+        .btn:hover {
+            transform: translateY(-1px);
+            background: #ffa36b;
+        }
+        .btn-danger {
+            background: #432028;
+            color: #ffd6dc;
+            border-color: #8f4f5a;
+        }
+        .btn-danger:hover {
+            background: #5a2b34;
+        }
+        .btn-small {
+            padding: 7px 10px;
+            font-size: 13px;
+            margin: 2px;
+        }
+        input, textarea {
+            padding: 10px 12px;
+            margin: 10px;
+            border-radius: 10px;
+            border: 1px solid #425b74;
+            width: 80%;
+            max-width: 420px;
+            background: rgba(13, 23, 33, 0.94);
+            color: var(--text);
+            outline: none;
+        }
+        input:focus, textarea:focus {
+            border-color: var(--accent-2);
+            box-shadow: 0 0 0 2px rgba(107, 227, 255, 0.12);
+        }
+        label {
+            display: block;
+            margin: 10px;
+            color: var(--muted);
+        }
+        #status {
+            margin-top: 20px;
+            font-size: 18px;
+            color: #ffd8bd;
+        }
+        .message-list {
+            max-height: 320px;
+            overflow-y: auto;
+            background: rgba(11, 18, 27, 0.82);
+            border-radius: 10px;
+            border: 1px solid #33495f;
+            padding: 10px;
+            margin: 12px 0;
+            text-align: left;
+        }
+        .message-item {
+            background: rgba(22, 33, 47, 0.88);
+            padding: 10px;
+            margin: 6px 0;
+            border-radius: 8px;
+            border: 1px solid #33495f;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+        }
+        .message-text {
+            flex-grow: 1;
+            margin-right: 10px;
+            word-break: break-word;
+            color: #dbe6f4;
+        }
+        .message-actions {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+        .input-group {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin: 10px 0;
+            flex-wrap: wrap;
+        }
+        .input-group input {
+            margin: 0;
+            min-width: 220px;
+        }
+        @media (max-width: 700px) {
+            .card {
+                padding: 14px;
+                border-radius: 12px;
+            }
+            .btn {
+                width: 100%;
+                margin: 6px 0;
+            }
+            input, textarea {
+                width: 100%;
+                max-width: none;
+            }
+            .message-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
     </style>
 </head>
 <body>
-    <h1>Bot TikTok</h1>
+    <h1>Studio TikTok Live</h1>
     <div class="card">
         <form method="post" action="/control">
             <button class="btn" name="action" value="start">Demarrer</button>
@@ -607,7 +815,7 @@ HTML_PAGE = """
         <p>Auto-messages : <span id="auto_status">{{ 'ON' if auto_messages else 'OFF' }}</span></p>
         <p>Messages configures : <span id="message_count">{{ messages|length }}</span></p>
     </div>
-    <h3 id="status">Status: En attente...</h3>
+    <h3 id="status">Status: Pret</h3>
     <script>
         setInterval(function(){
             fetch("/status?_=" + new Date().getTime())
